@@ -14,30 +14,43 @@
 	camera.lookAt(new Three.Vector3(0, 0, 0));
 	scene.add(camera);
 	
-	var light = new Three.PointLight(0x444444);
+	var light = new Three.AmbientLight(0xdddddd);
 	light.position = camera.position;
 	scene.add(light);
 	
-	var model = null, skins = [], loader = new Three.ColladaLoader();
-	loader.load('export.dae', function (collada) {
-		model = collada.scene;
+	var skins = [];
+	
+	new Three.ColladaLoader().load('export.dae', function (collada) {
 		skins = collada.skins;
+		
 		collada.scene.rotation.x = Math.PI;
+		
+		Three.SceneUtils.traverseHierarchy(collada.scene, function (node) {
+			var material;
+			if ((material = node.material)) {
+				node.material = new Three.MeshBasicMaterial({
+					map: material.map, morphTargets: material.morphTargets
+				});
+			}
+		});
+		
 		scene.add(collada.scene);
 	});
 	
-	function morph(skin, percent) {
+	function morph(skin, frame) {
 		var influences = skin.morphTargetInfluences;
 		var influencesCount = influences.length;
 		for (var t = 0; t < influencesCount; ++ t) influences[t] = 0;
-		influences[Math.floor(percent * influencesCount)] = 1;
+		influences[Math.floor(frame) % influencesCount] = 1;
 	}
 	
-	var frame = 0, speed = 1/30;
+	var frame = 0, fps = 15;
+	var clock = new Three.Clock();
 	(function animate() {
+		var currentFrame = Math.floor(frame);
 		for (var t = 0, T = skins.length; t < T; ++t)
-			morph(skins[t], frame);
-		frame = (frame + speed) % 1;
+			morph(skins[t], currentFrame);
+		frame = frame + clock.getDelta() * fps;
 		window.requestAnimationFrame(animate);
 		renderer.render(scene, camera);
 	}());
